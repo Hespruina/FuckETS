@@ -200,15 +200,34 @@ class ETS数据提取器:
         for q in questions:
             if not isinstance(q, dict):
                 continue
-            # 这里处理标准答案，可能有空的情况
-            std_answers = [std.get('value', '') for std in q.get('std', []) if isinstance(std, dict)]
+            # 改进：确保从std字段提取标准答案，并处理可能的空情况
+            std_answers = []
+            std_list = q.get('std')
+            if isinstance(std_list, list):
+                std_answers = [std.get('value', '').strip() for std in std_list if isinstance(std, dict) and std.get('value', '').strip()]
+            
+            # 获取问题文本，优先使用ask字段，清理HTML标签和占位符
+            ask_text = q.get('ask', '')
+            question_text = self._clean_html(ask_text)
+            
+            # 从问题文本中提取纯问题部分（移除选项）
+            # 查找括号内的选项部分并移除
+            clean_question = question_text
+            if '(' in question_text and ')' in question_text:
+                # 尝试提取问题部分
+                parts = question_text.split('(')
+                if parts:
+                    clean_question = parts[0].strip()
+            
+            # 获取音频文件路径
             audio = self._safe_get_audio(dir_path, q.get('askaudio'))
+            
             # 添加到数据列表中
             self.all_data.append({
                 'type': 'dialogue',
                 'id': q.get('xh', ''),
-                'question': self._clean_html(q.get('analyze', '')),  # 问题部分
-                'listening_text': self._clean_html(q.get('ask', '')),  # 听力原文
+                'question': clean_question,  # 清理后的问题
+                'listening_text': question_text,  # 完整的听力原文（包含选项）
                 'standard_answers': std_answers,
                 'keywords': q.get('keywords', ''),
                 'audio': audio,
